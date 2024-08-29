@@ -24,7 +24,7 @@ func main() {
 		fmt.Println()
 	}
 	for i := range 2 {
-		input = feedFoward(&wm[i], &input)
+		input = feedFoward(&input, &wm[i])
 	}
 	fmt.Println()
 	e := input.calculateError(&target)
@@ -62,8 +62,8 @@ func sigmoidActivation(x float64) float64 {
 	return 1 / (1 + math.Exp(-x))
 }
 
-func feedFoward(a *matrix, weight *matrix) matrix {
-	output := a.matrixMult(weight)
+func feedFoward(a *matrix, w *matrix) matrix {
+	output := w.matrixMult(a)
 	for i := range len(output) {
 		for j := range len(output[i]) {
 			output[i][j] = sigmoidActivation(output[i][j])
@@ -110,8 +110,6 @@ func (o *matrix) calculateError(t *matrix) matrix {
 		return matrix{}
 	}
 	e := createMatrix(o_rows, o_cols)
-	t.printMatrix()
-	o.printMatrix()
 	for i := range o_rows {
 		for j := range o_cols {
 			e[i][j] = math.Pow((*t)[i][j]-(*o)[i][j], 2)
