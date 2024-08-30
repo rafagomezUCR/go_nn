@@ -6,14 +6,27 @@ import (
 	"math/rand"
 )
 
-type matrix [][]float64
+type Matrix struct {
+	data [][]float64
+	rows int
+	cols int
+}
 
 func main() {
-	input := matrix{
-		{0.9, 0.2, 0.3},
+	input := Matrix{
+		data: [][]float64{
+			{0.9, 0.2, 0.3},
+		},
+		rows: 1,
+		cols: 3,
 	}
-	target := matrix{
-		{1, 0.7, 0.9},
+	input.printMatrix()
+	target := Matrix{
+		data: [][]float64{
+			{1, 0.7, 0.9},
+		},
+		rows: 1,
+		cols: 3,
 	}
 	target.transposeMatrix()
 	input.transposeMatrix()
@@ -31,27 +44,25 @@ func main() {
 	e.printMatrix()
 }
 
-func (a *matrix) printMatrix() {
-	for i := range len(*a) {
-		for j := range len((*a)[0]) {
-			fmt.Print((*a)[i][j], " ")
+func (a *Matrix) printMatrix() {
+	for i := range a.rows {
+		for j := range a.cols {
+			fmt.Print(a.data[i][j], " ")
 		}
 		fmt.Println()
 	}
 }
 
-func (a *matrix) matrixMult(b *matrix) matrix {
-	a_rows, a_cols := len(*a), len((*a)[0])
-	b_rows, b_cols := len(*b), len((*b)[0])
-	if a_cols != b_rows {
+func (a *Matrix) matrixMult(b *Matrix) Matrix {
+	if a.cols != b.rows {
 		fmt.Println("rows and cols do not match")
-		return matrix{}
+		return Matrix{}
 	}
-	res := createMatrix(a_rows, b_cols)
-	for i := range a_rows {
-		for j := range b_cols {
-			for k := range b_rows {
-				res[i][j] += (*a)[i][k] * (*b)[k][j]
+	res := createMatrix(a.rows, b.cols)
+	for i := range a.rows {
+		for j := range b.cols {
+			for k := range b.rows {
+				res.data[i][j] += a.data[i][k] * b.data[k][j]
 			}
 		}
 	}
@@ -62,66 +73,81 @@ func sigmoidActivation(x float64) float64 {
 	return 1 / (1 + math.Exp(-x))
 }
 
-func feedFoward(a *matrix, w *matrix) matrix {
+func feedFoward(a *Matrix, w *Matrix) Matrix {
 	output := w.matrixMult(a)
-	for i := range len(output) {
-		for j := range len(output[i]) {
-			output[i][j] = sigmoidActivation(output[i][j])
+	for i := range output.rows {
+		for j := range output.cols {
+			output.data[i][j] = sigmoidActivation(output.data[i][j])
 		}
 	}
-	output.printMatrix()
+	//output.printMatrix()
 	return output
 }
 
-func (a *matrix) transposeMatrix() {
-	a_rows, a_cols := len(*a), len((*a)[0])
-	b := createMatrix(a_cols, a_rows)
-	for i := range a_rows {
-		for j := range a_cols {
-			b[j][i] = (*a)[i][j]
+func errorBackpropagation(weight *Matrix, error *Matrix) Matrix {
+
+}
+
+func (a *Matrix) transposeMatrix() {
+	b := createMatrix(a.cols, a.rows)
+	for i := range a.rows {
+		for j := range a.cols {
+			b.data[j][i] = a.data[i][j]
 		}
 	}
 	*a = b
 }
 
+func transposeMatrix(a *Matrix) Matrix {
+	b := createMatrix(a.cols, a.rows)
+	for i := range a.rows {
+		for j := range a.cols {
+			b.data[j][i] = a.data[i][j]
+		}
+	}
+	return b
+}
+
 // right now all hidden layers will have 3 nodes
 // later im going to allow to customize the number of nodes per layer
-func initializeWeights(hiddenLayers int) []matrix {
-	weightMatrices := make([]matrix, 0)
+func initializeWeights(hiddenLayers int) []Matrix {
+	weightMatrices := make([]Matrix, 0)
 	for range hiddenLayers {
 		w := createMatrix(3, 3)
 		weightMatrices = append(weightMatrices, w)
 	}
 	for i := range len(weightMatrices) {
-		for j := range len(weightMatrices[i]) {
-			for k := range len(weightMatrices[i][j]) {
-				weightMatrices[i][j][k] = rand.Float64()
+		for j := range weightMatrices[i].rows {
+			for k := range weightMatrices[i].cols {
+				weightMatrices[i].data[j][k] = rand.Float64()
 			}
 		}
 	}
 	return weightMatrices
 }
 
-func (o *matrix) calculateError(t *matrix) matrix {
-	o_rows, o_cols := len(*o), len((*o)[0])
-	t_rows, t_cols := len(*t), len((*t)[0])
-	if o_rows != t_rows && o_cols != t_cols {
+func (o *Matrix) calculateError(t *Matrix) Matrix {
+	if o.rows != t.rows && o.cols != t.cols {
 		fmt.Println("output and target matrices dont match in length")
-		return matrix{}
+		return Matrix{}
 	}
-	e := createMatrix(o_rows, o_cols)
-	for i := range o_rows {
-		for j := range o_cols {
-			e[i][j] = math.Pow((*t)[i][j]-(*o)[i][j], 2)
+	e := createMatrix(o.rows, o.cols)
+	for i := range o.rows {
+		for j := range o.cols {
+			e.data[i][j] = math.Pow(t.data[i][j]-o.data[i][j], 2)
 		}
 	}
 	return e
 }
 
-func createMatrix(rows int, cols int) matrix {
-	m := make(matrix, rows)
-	for i := range len(m) {
-		m[i] = make([]float64, cols)
+func createMatrix(rows int, cols int) Matrix {
+	m := Matrix{
+		rows: rows,
+		cols: cols,
+	}
+	m.data = make([][]float64, rows)
+	for i := range rows {
+		m.data[i] = make([]float64, cols)
 	}
 	return m
 }
