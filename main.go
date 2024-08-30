@@ -13,35 +13,82 @@ type Matrix struct {
 }
 
 func main() {
-	input := Matrix{
+	weightMatrixIH := Matrix{
 		data: [][]float64{
-			{0.9, 0.2, 0.3},
+			{3.0, 2.0},
+			{1.0, 7.0},
 		},
-		rows: 1,
-		cols: 3,
+		rows: 2,
+		cols: 2,
 	}
-	input.printMatrix()
-	target := Matrix{
+	weightMatrixHO := Matrix{
 		data: [][]float64{
-			{1, 0.7, 0.9},
+			{2.0, 3.0},
+			{1.0, 4.0},
 		},
-		rows: 1,
-		cols: 3,
+		rows: 2,
+		cols: 2,
 	}
-	target.transposeMatrix()
-	input.transposeMatrix()
-	input.printMatrix()
-	wm := initializeWeights(2)
-	for i := range len(wm) {
-		wm[i].printMatrix()
-		fmt.Println()
+	weightMatrix := []Matrix{}
+	weightMatrix = append(weightMatrix, weightMatrixIH)
+	weightMatrix = append(weightMatrix, weightMatrixHO)
+	err_output := Matrix{
+		data: [][]float64{
+			{0.8},
+			{0.5},
+		},
+		rows: 2,
+		cols: 1,
 	}
-	for i := range 2 {
-		input = feedFoward(&input, &wm[i])
+	err_matrix := []Matrix{}
+	err_matrix = append(err_matrix, err_output)
+	for i := len(weightMatrix) - 1; i >= 0; i-- {
+		new_err := getErrorMatrix(&weightMatrix[i], &err_output)
+		err_matrix = append(err_matrix, new_err)
+		err_output = new_err
 	}
-	fmt.Println()
-	e := input.calculateError(&target)
-	e.printMatrix()
+
+	for i := range len(err_matrix) {
+		err_matrix[i].printMatrix()
+	}
+
+	// input := Matrix{
+	// 	data: [][]float64{
+	// 		{0.9, 0.2, 0.3},
+	// 	},
+	// 	rows: 1,
+	// 	cols: 3,
+	// }
+	// input.printMatrix()
+	// target := Matrix{
+	// 	data: [][]float64{
+	// 		{1, 0.7, 0.9},
+	// 	},
+	// 	rows: 1,
+	// 	cols: 3,
+	// }
+	// target.transposeMatrix()
+	// input.transposeMatrix()
+	// input.printMatrix()
+	// wm := initializeWeights(2)
+	// for i := range len(wm) {
+	// 	wm[i].printMatrix()
+	// 	fmt.Println()
+	// }
+	// for i := range 2 {
+	// 	input = feedFoward(&input, &wm[i])
+	// }
+	// fmt.Println()
+	// e := []Matrix{}
+	// e = append(e, input.calculateError(&target))
+	// e[0].printMatrix()
+	// for i := 1; i < 2; i++ {
+	// 	e = append(e, getErrorMatrix(&wm[i], &e[i-1]))
+	// }
+	// fmt.Println(len(e))
+	// for i := range len(e) {
+	// 	e[i].printMatrix()
+	// }
 }
 
 func (a *Matrix) printMatrix() {
@@ -80,12 +127,34 @@ func feedFoward(a *Matrix, w *Matrix) Matrix {
 			output.data[i][j] = sigmoidActivation(output.data[i][j])
 		}
 	}
-	//output.printMatrix()
 	return output
 }
 
-func errorBackpropagation(weight *Matrix, error *Matrix) Matrix {
+func getErrorMatrix(weight *Matrix, err *Matrix) Matrix {
+	sums := []float64{}
+	for i := range weight.rows {
+		sum := 0.0
+		for j := range weight.cols {
+			sum += weight.data[i][j]
+		}
+		sums = append(sums, sum)
+	}
+	for i := range weight.rows {
+		for j := range weight.cols {
+			weight.data[i][j] /= sums[i]
+		}
+	}
+	weight.transposeMatrix()
+	e := weight.matrixMult(err)
+	return e
+}
 
+func (a *Matrix) scaleMatrix(factor float64) {
+	for i := range a.rows {
+		for j := range a.cols {
+			a.data[i][j] *= factor
+		}
+	}
 }
 
 func (a *Matrix) transposeMatrix() {
