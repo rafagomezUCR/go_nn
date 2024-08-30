@@ -12,83 +12,60 @@ type Matrix struct {
 	cols int
 }
 
+type NN struct {
+	input_nodes   Matrix
+	output_nodes  Matrix
+	hidden_nodes  Matrix
+	learning_rate float64
+}
+
+func (n *NN) query(input_list *Matrix, wih *Matrix, who *Matrix) Matrix {
+	input_list.transposeMatrix()
+	hidden_inputs := wih.matrixMult(input_list)
+	hidden_outputs := sigmoidActivation(&hidden_inputs)
+	final_inputs := who.matrixMult(&hidden_outputs)
+	final_outputs := sigmoidActivation(&final_inputs)
+	return final_outputs
+}
+
 func main() {
-	weightMatrixIH := Matrix{
+	in := createMatrix(1, 3)
+	on := createMatrix(1, 3)
+	hn := createMatrix(1, 3)
+	lr := 0.3
+	n := NN{
+		input_nodes:   in,
+		output_nodes:  on,
+		hidden_nodes:  hn,
+		learning_rate: lr,
+	}
+	wih := Matrix{
 		data: [][]float64{
-			{3.0, 2.0},
-			{1.0, 7.0},
+			{0.1, 0.2, 0.3},
+			{0.2, 0.5, 0.4},
+			{0.2, 0.6, 0.01},
 		},
-		rows: 2,
-		cols: 2,
+		rows: 3,
+		cols: 3,
 	}
-	weightMatrixHO := Matrix{
+	who := Matrix{
 		data: [][]float64{
-			{2.0, 3.0},
-			{1.0, 4.0},
+			{0.3, 0.1, 0.3},
+			{0.2, 0.3, 0.8},
+			{0.1, 0.7, 0.01},
 		},
-		rows: 2,
-		cols: 2,
+		rows: 3,
+		cols: 3,
 	}
-	weightMatrix := []Matrix{}
-	weightMatrix = append(weightMatrix, weightMatrixIH)
-	weightMatrix = append(weightMatrix, weightMatrixHO)
-	err_output := Matrix{
+	input_list := Matrix{
 		data: [][]float64{
-			{0.8},
-			{0.5},
+			{0.1, 0.2, 0.5},
 		},
-		rows: 2,
-		cols: 1,
+		rows: 1,
+		cols: 3,
 	}
-	err_matrix := []Matrix{}
-	err_matrix = append(err_matrix, err_output)
-	for i := len(weightMatrix) - 1; i >= 0; i-- {
-		new_err := getErrorMatrix(&weightMatrix[i], &err_output)
-		err_matrix = append(err_matrix, new_err)
-		err_output = new_err
-	}
-
-	for i := range len(err_matrix) {
-		err_matrix[i].printMatrix()
-	}
-
-	// input := Matrix{
-	// 	data: [][]float64{
-	// 		{0.9, 0.2, 0.3},
-	// 	},
-	// 	rows: 1,
-	// 	cols: 3,
-	// }
-	// input.printMatrix()
-	// target := Matrix{
-	// 	data: [][]float64{
-	// 		{1, 0.7, 0.9},
-	// 	},
-	// 	rows: 1,
-	// 	cols: 3,
-	// }
-	// target.transposeMatrix()
-	// input.transposeMatrix()
-	// input.printMatrix()
-	// wm := initializeWeights(2)
-	// for i := range len(wm) {
-	// 	wm[i].printMatrix()
-	// 	fmt.Println()
-	// }
-	// for i := range 2 {
-	// 	input = feedFoward(&input, &wm[i])
-	// }
-	// fmt.Println()
-	// e := []Matrix{}
-	// e = append(e, input.calculateError(&target))
-	// e[0].printMatrix()
-	// for i := 1; i < 2; i++ {
-	// 	e = append(e, getErrorMatrix(&wm[i], &e[i-1]))
-	// }
-	// fmt.Println(len(e))
-	// for i := range len(e) {
-	// 	e[i].printMatrix()
-	// }
+	res := n.query(&input_list, &wih, &who)
+	res.printMatrix()
 }
 
 func (a *Matrix) printMatrix() {
@@ -116,38 +93,59 @@ func (a *Matrix) matrixMult(b *Matrix) Matrix {
 	return res
 }
 
-func sigmoidActivation(x float64) float64 {
-	return 1 / (1 + math.Exp(-x))
+func (matrix *Matrix) sigmoidActivation() {
+	for i := range matrix.rows {
+		for j := range matrix.cols {
+			matrix.data[i][j] = 1 / (1 + math.Exp(-matrix.data[i][j]))
+		}
+	}
 }
 
-func feedFoward(a *Matrix, w *Matrix) Matrix {
-	output := w.matrixMult(a)
-	for i := range output.rows {
-		for j := range output.cols {
-			output.data[i][j] = sigmoidActivation(output.data[i][j])
+func sigmoidActivation(matrix *Matrix) Matrix {
+	result_matrix := createMatrix(matrix.rows, matrix.cols)
+	for i := range matrix.rows {
+		for j := range matrix.cols {
+			result_matrix.data[i][j] = 1 / (1 + math.Exp(-matrix.data[i][j]))
 		}
 	}
-	return output
+	return result_matrix
 }
 
-func getErrorMatrix(weight *Matrix, err *Matrix) Matrix {
-	sums := []float64{}
-	for i := range weight.rows {
-		sum := 0.0
-		for j := range weight.cols {
-			sum += weight.data[i][j]
-		}
-		sums = append(sums, sum)
+func feedFoward(m Matrix, weightMatrix *[]Matrix) (Matrix, []Matrix) {
+	output_matrix := []Matrix{}
+	output_matrix = append(output_matrix, m)
+	network_length := len(*weightMatrix)
+	for i := range network_length {
+		m = (*weightMatrix)[i].matrixMult(&m)
+		m.sigmoidActivation()
+		output_matrix = append(output_matrix, m)
 	}
-	for i := range weight.rows {
-		for j := range weight.cols {
-			weight.data[i][j] /= sums[i]
-		}
-	}
-	weight.transposeMatrix()
-	e := weight.matrixMult(err)
-	return e
+	return m, output_matrix
 }
+
+// func getErrorMatrix(weight []Matrix, err *Matrix) []Matrix {
+// 	err_matrix := []Matrix{}
+// 	for i := range len(weight) {
+// 		sums := []float64{}
+// 		for i := range weight[i].rows {
+// 			sum := 0.0
+// 			for j := range weight[i].cols {
+// 				sum += weight[i].data[i][j]
+// 			}
+// 			sums = append(sums, sum)
+// 		}
+// 		for i := range weight[i].rows {
+// 			for j := range weight[i].cols {
+// 				weight[i].data[i][j] /= sums[i]
+// 			}
+// 		}
+// 		weight[i].transposeMatrix()
+// 		e := weight[i].matrixMult(err)
+// 		err_matrix = append(err_matrix, e)
+// 		//return e
+// 	}
+// 	return err_matrix
+// }
 
 func (a *Matrix) scaleMatrix(factor float64) {
 	for i := range a.rows {
@@ -177,13 +175,19 @@ func transposeMatrix(a *Matrix) Matrix {
 	return b
 }
 
-// right now all hidden layers will have 3 nodes
-// later im going to allow to customize the number of nodes per layer
-func initializeWeights(hiddenLayers int) []Matrix {
+func initializeWeights(neurons_per_layer []int, input_layer_size int, output_layer_size int) []Matrix {
 	weightMatrices := make([]Matrix, 0)
-	for range hiddenLayers {
-		w := createMatrix(3, 3)
-		weightMatrices = append(weightMatrices, w)
+	for i := range len(neurons_per_layer) + 1 {
+		if i == 0 {
+			w := createMatrix(neurons_per_layer[i], input_layer_size)
+			weightMatrices = append(weightMatrices, w)
+		} else if i == len(neurons_per_layer) {
+			w := createMatrix(output_layer_size, neurons_per_layer[i-1])
+			weightMatrices = append(weightMatrices, w)
+		} else {
+			w := createMatrix(neurons_per_layer[i], neurons_per_layer[i-1])
+			weightMatrices = append(weightMatrices, w)
+		}
 	}
 	for i := range len(weightMatrices) {
 		for j := range weightMatrices[i].rows {
