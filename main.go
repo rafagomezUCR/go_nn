@@ -12,60 +12,47 @@ type Matrix struct {
 	cols int
 }
 
-type NN struct {
-	input_nodes   Matrix
-	output_nodes  Matrix
-	hidden_nodes  Matrix
-	learning_rate float64
+func query(input_list *Matrix, weight_matrices *[]Matrix) Matrix {
+	input_list_t := transposeMatrix(input_list)
+	for i := range len(*weight_matrices) {
+		signal_output := (*weight_matrices)[i].matrixMult(&input_list_t)
+		signal_output.sigmoidActivation()
+		input_list_t = signal_output
+	}
+	return input_list_t
 }
 
-func (n *NN) query(input_list *Matrix, wih *Matrix, who *Matrix) Matrix {
-	input_list.transposeMatrix()
-	hidden_inputs := wih.matrixMult(input_list)
-	hidden_outputs := sigmoidActivation(&hidden_inputs)
-	final_inputs := who.matrixMult(&hidden_outputs)
-	final_outputs := sigmoidActivation(&final_inputs)
-	return final_outputs
+func train(input_list *Matrix, weight_matrices *[]Matrix, target_list *Matrix) {
+	network_output := query(input_list, weight_matrices)
+	error_output := calculateError(&network_output, target_list)
+	for i := len(*weight_matrices) - 1; i > 0; i-- {
+		weight_t := transposeMatrix(&(*weight_matrices)[i])
+		error_hidden := weight_t.matrixMult(&error_output)
+		// right here goes gradient descent
+		error_output = error_hidden
+	}
 }
 
 func main() {
-	in := createMatrix(1, 3)
-	on := createMatrix(1, 3)
-	hn := createMatrix(1, 3)
-	lr := 0.3
-	n := NN{
-		input_nodes:   in,
-		output_nodes:  on,
-		hidden_nodes:  hn,
-		learning_rate: lr,
-	}
-	wih := Matrix{
-		data: [][]float64{
-			{0.1, 0.2, 0.3},
-			{0.2, 0.5, 0.4},
-			{0.2, 0.6, 0.01},
-		},
-		rows: 3,
-		cols: 3,
-	}
-	who := Matrix{
-		data: [][]float64{
-			{0.3, 0.1, 0.3},
-			{0.2, 0.3, 0.8},
-			{0.1, 0.7, 0.01},
-		},
-		rows: 3,
-		cols: 3,
-	}
+	//lr := 0.3
+	weight_matrices := initializeWeights([]int{2, 3}, 3, 3)
 	input_list := Matrix{
 		data: [][]float64{
-			{0.1, 0.2, 0.5},
+			{0.9, 0.1, 0.8},
 		},
 		rows: 1,
 		cols: 3,
 	}
-	res := n.query(&input_list, &wih, &who)
-	res.printMatrix()
+	target_list := Matrix{
+		data: [][]float64{
+			{1.0},
+			{2.0},
+			{1.0},
+		},
+		rows: 3,
+		cols: 1,
+	}
+	train(&input_list, &weight_matrices, &target_list)
 }
 
 func (a *Matrix) printMatrix() {
@@ -75,6 +62,16 @@ func (a *Matrix) printMatrix() {
 		}
 		fmt.Println()
 	}
+}
+
+func add_matrices(a *Matrix, b *Matrix) Matrix {
+	res := createMatrix(a.rows, a.cols)
+	for i := range a.rows {
+		for j := range a.cols {
+			res.data[i][j] = a.data[i][j] + b.data[i][j]
+		}
+	}
+	return res
 }
 
 func (a *Matrix) matrixMult(b *Matrix) Matrix {
@@ -110,42 +107,6 @@ func sigmoidActivation(matrix *Matrix) Matrix {
 	}
 	return result_matrix
 }
-
-func feedFoward(m Matrix, weightMatrix *[]Matrix) (Matrix, []Matrix) {
-	output_matrix := []Matrix{}
-	output_matrix = append(output_matrix, m)
-	network_length := len(*weightMatrix)
-	for i := range network_length {
-		m = (*weightMatrix)[i].matrixMult(&m)
-		m.sigmoidActivation()
-		output_matrix = append(output_matrix, m)
-	}
-	return m, output_matrix
-}
-
-// func getErrorMatrix(weight []Matrix, err *Matrix) []Matrix {
-// 	err_matrix := []Matrix{}
-// 	for i := range len(weight) {
-// 		sums := []float64{}
-// 		for i := range weight[i].rows {
-// 			sum := 0.0
-// 			for j := range weight[i].cols {
-// 				sum += weight[i].data[i][j]
-// 			}
-// 			sums = append(sums, sum)
-// 		}
-// 		for i := range weight[i].rows {
-// 			for j := range weight[i].cols {
-// 				weight[i].data[i][j] /= sums[i]
-// 			}
-// 		}
-// 		weight[i].transposeMatrix()
-// 		e := weight[i].matrixMult(err)
-// 		err_matrix = append(err_matrix, e)
-// 		//return e
-// 	}
-// 	return err_matrix
-// }
 
 func (a *Matrix) scaleMatrix(factor float64) {
 	for i := range a.rows {
@@ -199,7 +160,7 @@ func initializeWeights(neurons_per_layer []int, input_layer_size int, output_lay
 	return weightMatrices
 }
 
-func (o *Matrix) calculateError(t *Matrix) Matrix {
+func calculateError(o *Matrix, t *Matrix) Matrix {
 	if o.rows != t.rows && o.cols != t.cols {
 		fmt.Println("output and target matrices dont match in length")
 		return Matrix{}
