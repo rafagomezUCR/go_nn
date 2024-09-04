@@ -12,30 +12,40 @@ type Matrix struct {
 	cols int
 }
 
-func query(input_list *Matrix, weight_matrices *[]Matrix) Matrix {
+func query(input_list *Matrix, weight_matrices []Matrix) []Matrix {
+	output_list := make([]Matrix, 0)
 	input_list_t := transposeMatrix(input_list)
-	for i := range len(*weight_matrices) {
-		signal_output := (*weight_matrices)[i].matrixMult(&input_list_t)
+	output_list = append(output_list, input_list_t)
+	for i := range len(weight_matrices) {
+		signal_output := (weight_matrices)[i].matrixMult(&input_list_t)
 		signal_output.sigmoidActivation()
+		output_list = append(output_list, signal_output)
 		input_list_t = signal_output
 	}
-	return input_list_t
+	return output_list
 }
 
-func train(input_list *Matrix, weight_matrices *[]Matrix, target_list *Matrix) {
-	network_output := query(input_list, weight_matrices)
-	error_output := calculateError(&network_output, target_list)
-	for i := len(*weight_matrices) - 1; i > 0; i-- {
-		weight_t := transposeMatrix(&(*weight_matrices)[i])
+func train(input_list *Matrix, weight_matrices []Matrix, target_list *Matrix, learning_rate float64) {
+	network_outputs := query(input_list, weight_matrices)
+	error_output := calculateError(&network_outputs[len(network_outputs)-1], target_list)
+	for i := len(weight_matrices) - 1; i >= 0; i-- {
+		weight_t := transposeMatrix(&(weight_matrices)[i])
 		error_hidden := weight_t.matrixMult(&error_output)
 		// right here goes gradient descent
+		one_subtract_o := scalar_minus_matrix(1.0, &network_outputs[i+1])
+		de_dw := elementwise_matrix_multiplication(&network_outputs[i+1], &one_subtract_o)
+		de_dw = elementwise_matrix_multiplication(&error_output, &de_dw)
+		hidden_outputs := transposeMatrix(&network_outputs[i])
+		de_dw = de_dw.matrixMult(&hidden_outputs)
+		de_dw = scale_matrix(learning_rate, &de_dw)
+		weight_matrices[i] = subtract_matrices(&(weight_matrices)[i], &de_dw)
 		error_output = error_hidden
 	}
 }
 
 func main() {
-	//lr := 0.3
-	weight_matrices := initializeWeights([]int{2, 3}, 3, 3)
+	lr := 0.3
+	weight_matrices := initializeWeights(3, []int{2}, 3)
 	input_list := Matrix{
 		data: [][]float64{
 			{0.9, 0.1, 0.8},
@@ -52,7 +62,21 @@ func main() {
 		rows: 3,
 		cols: 1,
 	}
-	train(&input_list, &weight_matrices, &target_list)
+	for i := range len(weight_matrices) {
+		weight_matrices[i].printMatrix()
+		fmt.Println()
+	}
+	fmt.Println("------------------------------------")
+	fmt.Println()
+	for range 100 {
+		train(&input_list, weight_matrices, &target_list, lr)
+	}
+	for i := range len(weight_matrices) {
+		weight_matrices[i].printMatrix()
+		fmt.Println()
+	}
+	a := query(&input_list, weight_matrices)
+	a[len(a)-1].printMatrix()
 }
 
 func (a *Matrix) printMatrix() {
@@ -65,10 +89,62 @@ func (a *Matrix) printMatrix() {
 }
 
 func add_matrices(a *Matrix, b *Matrix) Matrix {
+	if a.rows != b.rows || a.cols != b.cols {
+		fmt.Println("matrices do not match for subtracting")
+		return Matrix{}
+	}
 	res := createMatrix(a.rows, a.cols)
 	for i := range a.rows {
 		for j := range a.cols {
 			res.data[i][j] = a.data[i][j] + b.data[i][j]
+		}
+	}
+	return res
+}
+
+func subtract_matrices(a *Matrix, b *Matrix) Matrix {
+	if a.rows != b.rows || a.cols != b.cols {
+		fmt.Println("matrices do not match for subtracting")
+		return Matrix{}
+	}
+	res := createMatrix(a.rows, a.cols)
+	for i := range a.rows {
+		for j := range a.cols {
+			res.data[i][j] = a.data[i][j] - b.data[i][j]
+		}
+	}
+	return res
+}
+
+func scalar_minus_matrix(scalar float64, a *Matrix) Matrix {
+	res := createMatrix(a.rows, a.cols)
+	for i := range a.rows {
+		for j := range a.cols {
+			res.data[i][j] = scalar - a.data[i][j]
+		}
+	}
+	return res
+}
+
+func scale_matrix(scalar float64, a *Matrix) Matrix {
+	res := createMatrix(a.rows, a.cols)
+	for i := range a.rows {
+		for j := range a.cols {
+			res.data[i][j] = scalar * a.data[i][j]
+		}
+	}
+	return res
+}
+
+func elementwise_matrix_multiplication(a *Matrix, b *Matrix) Matrix {
+	if a.rows != b.rows || a.cols != b.cols {
+		fmt.Println("matrices do not match for elementwise multiplication")
+		return Matrix{}
+	}
+	res := createMatrix(a.rows, a.cols)
+	for i := range a.rows {
+		for j := range a.cols {
+			res.data[i][j] = a.data[i][j] * b.data[i][j]
 		}
 	}
 	return res
@@ -136,7 +212,7 @@ func transposeMatrix(a *Matrix) Matrix {
 	return b
 }
 
-func initializeWeights(neurons_per_layer []int, input_layer_size int, output_layer_size int) []Matrix {
+func initializeWeights(input_layer_size int, neurons_per_layer []int, output_layer_size int) []Matrix {
 	weightMatrices := make([]Matrix, 0)
 	for i := range len(neurons_per_layer) + 1 {
 		if i == 0 {
@@ -168,7 +244,7 @@ func calculateError(o *Matrix, t *Matrix) Matrix {
 	e := createMatrix(o.rows, o.cols)
 	for i := range o.rows {
 		for j := range o.cols {
-			e.data[i][j] = math.Pow(t.data[i][j]-o.data[i][j], 2)
+			e.data[i][j] = t.data[i][j] - o.data[i][j]
 		}
 	}
 	return e
