@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 )
 
 type Matrix struct {
@@ -43,40 +45,58 @@ func train(input_list *Matrix, weight_matrices []Matrix, target_list *Matrix, le
 	}
 }
 
+func checkE(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
 func main() {
-	lr := 0.3
-	weight_matrices := initializeWeights(3, []int{2}, 3)
-	input_list := Matrix{
-		data: [][]float64{
-			{0.9, 0.1, 0.8},
-		},
-		rows: 1,
-		cols: 3,
+	dat, err := os.Open("C:/Users/ruffl/Desktop/mnist data set/mnist_train.csv")
+	checkE(err)
+	//train_data := make([][]byte, 0)
+	newReader := bufio.NewReader(dat)
+	line, isPrefix, err := newReader.ReadLine()
+	checkE(err)
+	fmt.Println(isPrefix)
+	for i := range len(line) {
+		fmt.Print(string(line[i]))
 	}
-	target_list := Matrix{
-		data: [][]float64{
-			{1.0},
-			{2.0},
-			{1.0},
-		},
-		rows: 3,
-		cols: 1,
-	}
-	for i := range len(weight_matrices) {
-		weight_matrices[i].printMatrix()
-		fmt.Println()
-	}
-	fmt.Println("------------------------------------")
-	fmt.Println()
-	for range 100 {
-		train(&input_list, weight_matrices, &target_list, lr)
-	}
-	for i := range len(weight_matrices) {
-		weight_matrices[i].printMatrix()
-		fmt.Println()
-	}
-	a := query(&input_list, weight_matrices)
-	a[len(a)-1].printMatrix()
+	dat.Close()
+
+	// lr := 0.3
+	// weight_matrices := initializeWeights(3, []int{2}, 3)
+	// input_list := Matrix{
+	// 	data: [][]float64{
+	// 		{0.9, 0.1, 0.8},
+	// 	},
+	// 	rows: 1,
+	// 	cols: 3,
+	// }
+	// target_list := Matrix{
+	// 	data: [][]float64{
+	// 		{1.0},
+	// 		{2.0},
+	// 		{1.0},
+	// 	},
+	// 	rows: 3,
+	// 	cols: 1,
+	// }
+	// for i := range len(weight_matrices) {
+	// 	weight_matrices[i].printMatrix()
+	// 	fmt.Println()
+	// }
+	// fmt.Println("------------------------------------")
+	// fmt.Println()
+	// for range 100 {
+	// 	train(&input_list, weight_matrices, &target_list, lr)
+	// }
+	// for i := range len(weight_matrices) {
+	// 	weight_matrices[i].printMatrix()
+	// 	fmt.Println()
+	// }
+	// a := query(&input_list, weight_matrices)
+	// a[len(a)-1].printMatrix()
 }
 
 func (a *Matrix) printMatrix() {
