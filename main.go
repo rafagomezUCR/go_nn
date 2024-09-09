@@ -6,6 +6,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
+	"strings"
 )
 
 type Matrix struct {
@@ -40,63 +42,117 @@ func train(input_list *Matrix, weight_matrices []Matrix, target_list *Matrix, le
 		hidden_outputs := transposeMatrix(&network_outputs[i])
 		de_dw = de_dw.matrixMult(&hidden_outputs)
 		de_dw = scale_matrix(learning_rate, &de_dw)
-		weight_matrices[i] = subtract_matrices(&(weight_matrices)[i], &de_dw)
+		weight_matrices[i] = add_matrices(&(weight_matrices)[i], &de_dw)
 		error_output = error_hidden
 	}
 }
 
-func checkE(e error) {
+func test(input_list *Matrix, weight_matrices []Matrix) {
+	input_list_t := transposeMatrix(input_list)
+	for i := range len(weight_matrices) {
+		signal_output := (weight_matrices)[i].matrixMult(&input_list_t)
+		signal_output.sigmoidActivation()
+		input_list_t = signal_output
+	}
+	input_list_t.printMatrix()
+}
+
+func checkError(e error) {
 	if e != nil {
 		panic(e)
 	}
 }
 
-func main() {
-	dat, err := os.Open("C:/Users/ruffl/Desktop/mnist data set/mnist_train.csv")
-	checkE(err)
-	//train_data := make([][]byte, 0)
-	newReader := bufio.NewReader(dat)
-	line, isPrefix, err := newReader.ReadLine()
-	checkE(err)
-	fmt.Println(isPrefix)
-	for i := range len(line) {
-		fmt.Print(string(line[i]))
+func convertFileValuesToMatrix(input *string, delimiter string) (Matrix, float64) {
+	strs := strings.Split(*input, delimiter)
+	input_matrix := createMatrix(1, len(strs)-1)
+	var target_value float64
+	for i, str := range strs {
+		val, err := strconv.ParseFloat(str, 64)
+		checkError(err)
+		if i == 0 {
+			target_value = val
+		} else {
+			val = (val / 255 * 0.99)
+			if val == 0 {
+				val += 0.01
+			}
+			input_matrix.data[0][i-1] = val
+		}
 	}
-	dat.Close()
+	return input_matrix, target_value
+}
 
-	// lr := 0.3
-	// weight_matrices := initializeWeights(3, []int{2}, 3)
-	// input_list := Matrix{
-	// 	data: [][]float64{
-	// 		{0.9, 0.1, 0.8},
-	// 	},
-	// 	rows: 1,
-	// 	cols: 3,
-	// }
-	// target_list := Matrix{
-	// 	data: [][]float64{
-	// 		{1.0},
-	// 		{2.0},
-	// 		{1.0},
-	// 	},
-	// 	rows: 3,
-	// 	cols: 1,
-	// }
-	// for i := range len(weight_matrices) {
-	// 	weight_matrices[i].printMatrix()
-	// 	fmt.Println()
-	// }
-	// fmt.Println("------------------------------------")
-	// fmt.Println()
-	// for range 100 {
-	// 	train(&input_list, weight_matrices, &target_list, lr)
-	// }
-	// for i := range len(weight_matrices) {
-	// 	weight_matrices[i].printMatrix()
-	// 	fmt.Println()
-	// }
-	// a := query(&input_list, weight_matrices)
-	// a[len(a)-1].printMatrix()
+func createTargetList(target float64) Matrix {
+	target_list := Matrix{
+		data: [][]float64{
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+			{0.01},
+		},
+		rows: 10,
+		cols: 1,
+	}
+	target_list.data[int(target)][0] = 0.99
+	return target_list
+}
+
+func main() {
+	weight_matrices := initializeWeights(784, []int{100}, 10)
+	learning_rate := 0.3
+	epochs := 1
+	train_file, err := os.Open("C:/Users/ruffl/Desktop/mnist data set/mnist_train.csv")
+	test_file, test_err := os.Open("C:/Users/ruffl/Desktop/mnist data set/mnist_test.csv")
+	checkError(test_err)
+	checkError(err)
+	defer train_file.Close()
+	defer test_file.Close()
+	scanner := bufio.NewScanner(train_file)
+	test_scanner := bufio.NewScanner(test_file)
+	//i := 1
+	if test_scanner.Scan() {
+		line := test_scanner.Text()
+		il, _ := convertFileValuesToMatrix(&line, ",")
+		test(&il, weight_matrices)
+		fmt.Println()
+	} else {
+		fmt.Println("Error reading file: ", test_scanner.Err())
+	}
+	for range epochs {
+		for scanner.Scan() {
+			//fmt.Println("training on: ", i)
+			line := scanner.Text()
+			input_list, target := convertFileValuesToMatrix(&line, ",")
+			target_list := createTargetList(target)
+			train(&input_list, weight_matrices, &target_list, learning_rate)
+			//i++
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading file: ", err)
+	}
+	if test_scanner.Scan() {
+		line := test_scanner.Text()
+		il, _ := convertFileValuesToMatrix(&line, ",")
+		test(&il, weight_matrices)
+		fmt.Println()
+	} else {
+		fmt.Println("Error reading file: ", test_scanner.Err())
+	}
+	if test_scanner.Scan() {
+		line := test_scanner.Text()
+		il, _ := convertFileValuesToMatrix(&line, ",")
+		test(&il, weight_matrices)
+	} else {
+		fmt.Println("Error reading file: ", test_scanner.Err())
+	}
 }
 
 func (a *Matrix) printMatrix() {
@@ -249,7 +305,7 @@ func initializeWeights(input_layer_size int, neurons_per_layer []int, output_lay
 	for i := range len(weightMatrices) {
 		for j := range weightMatrices[i].rows {
 			for k := range weightMatrices[i].cols {
-				weightMatrices[i].data[j][k] = rand.Float64()
+				weightMatrices[i].data[j][k] = rand.Float64() - 0.5
 			}
 		}
 	}
