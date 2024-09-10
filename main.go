@@ -16,6 +16,57 @@ type Matrix struct {
 	cols int
 }
 
+type NN struct {
+	weights       []Matrix
+	activation    string
+	input_layer   Matrix
+	target        Matrix
+	hidden_layers []int
+	learning_rate float64
+	epochs        int
+}
+
+func (nn *NN) feed_foward() []Matrix {
+	output_list := make([]Matrix, 0)
+	input_list_t := transposeMatrix(&nn.input_layer)
+	output_list = append(output_list, input_list_t)
+	for i := range len(nn.weights) {
+		signal_output := nn.weights[i].matrixMult(&input_list_t)
+		signal_output.sigmoidActivation()
+		output_list = append(output_list, signal_output)
+		input_list_t = signal_output
+	}
+	return output_list
+}
+
+func (nn *NN) train() {
+	network_outputs := nn.feed_foward()
+	error_output := calculateError(&network_outputs[len(network_outputs)-1], &nn.target)
+	for i := len(nn.weights) - 1; i >= 0; i-- {
+		weight_t := transposeMatrix(&(nn.weights)[i])
+		error_hidden := weight_t.matrixMult(&error_output)
+		// right here goes gradient descent
+		one_subtract_o := scalar_minus_matrix(1.0, &network_outputs[i+1])
+		de_dw := elementwise_matrix_multiplication(&network_outputs[i+1], &one_subtract_o)
+		de_dw = elementwise_matrix_multiplication(&error_output, &de_dw)
+		hidden_outputs := transposeMatrix(&network_outputs[i])
+		de_dw = de_dw.matrixMult(&hidden_outputs)
+		de_dw = scale_matrix(nn.learning_rate, &de_dw)
+		nn.weights[i] = add_matrices(&(nn.weights)[i], &de_dw)
+		error_output = error_hidden
+	}
+}
+
+func (nn *NN) test() Matrix {
+	input_list_t := transposeMatrix(&nn.input_layer)
+	for i := range len(nn.weights) {
+		signal_output := nn.weights[i].matrixMult(&input_list_t)
+		signal_output.sigmoidActivation()
+		input_list_t = signal_output
+	}
+	return input_list_t
+}
+
 func query(input_list *Matrix, weight_matrices []Matrix) []Matrix {
 	output_list := make([]Matrix, 0)
 	input_list_t := transposeMatrix(input_list)
@@ -105,9 +156,21 @@ func createTargetList(target float64) Matrix {
 }
 
 func main() {
-	weight_matrices := initializeWeights(784, []int{100}, 10)
 	learning_rate := 0.3
+	hidden_layers := []int{100, 50}
+	activation := "s"
 	epochs := 1
+	weight_matrices := initializeWeights(784, hidden_layers, 10)
+	nn := NN{
+		learning_rate: learning_rate,
+		hidden_layers: hidden_layers,
+		activation:    activation,
+		epochs:        epochs,
+		weights:       weight_matrices,
+	}
+	// weight_matrices := initializeWeights(784, []int{100}, 10)
+	// learning_rate := 0.3
+	// epochs := 1
 	train_file, err := os.Open("C:/Users/ruffl/Desktop/mnist data set/mnist_train.csv")
 	test_file, test_err := os.Open("C:/Users/ruffl/Desktop/mnist data set/mnist_test.csv")
 	checkError(test_err)
@@ -116,23 +179,25 @@ func main() {
 	defer test_file.Close()
 	scanner := bufio.NewScanner(train_file)
 	test_scanner := bufio.NewScanner(test_file)
-	//i := 1
 	if test_scanner.Scan() {
 		line := test_scanner.Text()
 		il, _ := convertFileValuesToMatrix(&line, ",")
-		test(&il, weight_matrices)
+		nn.input_layer = il
+		result := nn.test()
+		result.printMatrix()
 		fmt.Println()
 	} else {
 		fmt.Println("Error reading file: ", test_scanner.Err())
 	}
 	for range epochs {
 		for scanner.Scan() {
-			//fmt.Println("training on: ", i)
 			line := scanner.Text()
 			input_list, target := convertFileValuesToMatrix(&line, ",")
 			target_list := createTargetList(target)
-			train(&input_list, weight_matrices, &target_list, learning_rate)
-			//i++
+			nn.input_layer = input_list
+			nn.target = target_list
+			nn.train()
+			//train(&input_list, weight_matrices, &target_list, learning_rate)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -141,18 +206,20 @@ func main() {
 	if test_scanner.Scan() {
 		line := test_scanner.Text()
 		il, _ := convertFileValuesToMatrix(&line, ",")
-		test(&il, weight_matrices)
+		nn.input_layer = il
+		result := nn.test()
+		result.printMatrix()
 		fmt.Println()
 	} else {
 		fmt.Println("Error reading file: ", test_scanner.Err())
 	}
-	if test_scanner.Scan() {
-		line := test_scanner.Text()
-		il, _ := convertFileValuesToMatrix(&line, ",")
-		test(&il, weight_matrices)
-	} else {
-		fmt.Println("Error reading file: ", test_scanner.Err())
-	}
+	// if test_scanner.Scan() {
+	// 	line := test_scanner.Text()
+	// 	il, _ := convertFileValuesToMatrix(&line, ",")
+	// 	test(&il, weight_matrices)
+	// } else {
+	// 	fmt.Println("Error reading file: ", test_scanner.Err())
+	// }
 }
 
 func (a *Matrix) printMatrix() {
