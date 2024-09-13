@@ -102,7 +102,8 @@ func main() {
 	}
 	if test_scanner.Scan() {
 		line := test_scanner.Text()
-		il, _ := convertFileValuesToMatrix(&line, ",")
+		il, target := convertFileValuesToMatrix(&line, ",")
+		fmt.Println(target)
 		nn.input_layer = il
 		result := nn.query()
 		result.printMatrix()
